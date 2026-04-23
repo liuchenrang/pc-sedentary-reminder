@@ -1,3 +1,4 @@
 build/bin
+README.md
 node_modules
 frontend/dist
