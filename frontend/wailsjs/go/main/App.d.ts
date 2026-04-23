@@ -16,6 +16,8 @@ export function SetActivateOnTimer(arg1:boolean):Promise<void>;
 
 export function SetInterval(arg1:number):Promise<void>;
 
+export function SetLoopMode(arg1:boolean):Promise<void>;
+
 export function SetMessage(arg1:string):Promise<void>;
 
 export function SetNotificationDuration(arg1:number):Promise<void>;

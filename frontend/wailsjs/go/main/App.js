@@ -30,6 +30,10 @@ export function SetInterval(arg1) {
   return window['go']['main']['App']['SetInterval'](arg1);
 }
 
+export function SetLoopMode(arg1) {
+  return window['go']['main']['App']['SetLoopMode'](arg1);
+}
+
 export function SetMessage(arg1) {
   return window['go']['main']['App']['SetMessage'](arg1);
 }

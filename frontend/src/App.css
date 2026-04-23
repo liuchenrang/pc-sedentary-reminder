@@ -627,3 +627,29 @@ input:disabled + .slider {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+.hint-text {
+    font-size: 0.75rem;
+    color: #86868b;
+    margin-left: 8px;
+}
+
+.shortcut-display {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #007aff;
+    background: rgba(0, 122, 255, 0.1);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Mono", monospace;
+}
+
+.shortcut-preview {
+    font-size: 0.85rem;
+    color: #86868b;
+}
+
+.shortcut-preview .key {
+    font-weight: 600;
+    color: #007aff;
+}

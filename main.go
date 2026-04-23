@@ -15,11 +15,12 @@ func main() {
 	// Create an instance of the app structure
 	app := NewApp()
 
-	// 创建应用
+	// 创建应用（菜单由 app.startup 动态创建）
 	err := wails.Run(&options.App{
 		Title:     "久坐提醒",
 		Width:     400,
 		Height:    700,
+		Frameless: false,
 		MinWidth:  400,
 		MinHeight: 600,
 		AssetServer: &assetserver.Options{
@@ -27,6 +28,7 @@ func main() {
 		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup:        app.startup,
+		OnBeforeClose:    app.beforeClose,
 		Bind: []interface{}{
 			app,
 		},

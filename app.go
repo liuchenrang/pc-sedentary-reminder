@@ -7,10 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/gen2brain/beeep"
+	"github.com/wailsapp/wails/v2/pkg/menu"
+	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -20,20 +23,24 @@ const configFileName = "sitlong-config.json"
 // ShortcutConfig 快捷键配置
 type ShortcutConfig struct {
 	ResetKey       string `json:"resetKey"`       // 重置键
+	StartKey       string `json:"startKey"`       // 开始键
 	CloseNotifyKey string `json:"closeNotifyKey"` // 关闭通知键
 	Ctrl           bool   `json:"ctrl"`           // 是否使用Ctrl
-	Shift          bool   `json:"shift"`           // 是否使用Shift
+	Shift          bool   `json:"shift"`          // 是否使用Shift
 	Alt            bool   `json:"alt"`            // 是否使用Alt
+	Global         bool   `json:"global"`         // 是否全局热键
 }
 
 // 默认快捷键配置
 func defaultShortcutConfig() ShortcutConfig {
 	return ShortcutConfig{
 		ResetKey:       "r",
+		StartKey:       "s",
 		CloseNotifyKey: "Escape",
 		Ctrl:           true,
 		Shift:          true,
 		Alt:            false,
+		Global:         true,
 	}
 }
 
@@ -44,6 +51,7 @@ type Settings struct {
 	NotificationDuration int              `json:"notificationDuration"`   // 通知持续时间（秒），0表示持久
 	ActivateOnTimer       bool             `json:"activateOnTimer"`       // 时间到时激活窗口
 	Message               string           `json:"message"`               // 提醒文案
+	LoopMode              bool             `json:"loopMode"`              // 循环模式
 }
 
 // SitLongConfig 前端配置结构
@@ -55,6 +63,7 @@ type SitLongConfig struct {
 	NotificationDuration int              `json:"notificationDuration"`
 	ActivateOnTimer      bool             `json:"activateOnTimer"`
 	Message               string           `json:"message"`
+	LoopMode             bool             `json:"loopMode"`
 }
 
 // App struct
@@ -67,6 +76,7 @@ type App struct {
 	isRunning    bool
 	lastTickTime time.Time
 	configDir    string
+	appMenu     *menu.Menu
 }
 
 // NewApp creates a new App application struct
@@ -78,10 +88,101 @@ func NewApp() *App {
 			NotificationDuration: 0, // 默认持久显示
 			ActivateOnTimer:      true, // 默认激活窗口
 			Message:              "您已经坐了很久了，起来活动一下吧！", // 默认提醒文案
+			LoopMode:             false, // 默认关闭循环模式
 		},
 		remaining:    30 * time.Minute,
 		isRunning:    false,
 	}
+}
+
+// buildResetAccelerator 根据快捷键配置构建加速器（重置）
+func (a *App) buildResetAccelerator() string {
+	var mods []string
+	sc := a.settings.Shortcut
+
+	if sc.Ctrl {
+		mods = append(mods, "ctrl")
+	}
+	if sc.Shift {
+		mods = append(mods, "shift")
+	}
+	if sc.Alt {
+		mods = append(mods, "alt")
+	}
+
+	key := strings.ToLower(sc.ResetKey)
+	if len(mods) > 0 {
+		return strings.Join(mods, "+") + "+" + key
+	}
+	return key
+}
+
+// buildStartAccelerator 根据快捷键配置构建加速器（开始）
+func (a *App) buildStartAccelerator() string {
+	var mods []string
+	sc := a.settings.Shortcut
+
+	if sc.Ctrl {
+		mods = append(mods, "ctrl")
+	}
+	if sc.Shift {
+		mods = append(mods, "shift")
+	}
+	if sc.Alt {
+		mods = append(mods, "alt")
+	}
+
+	key := strings.ToLower(sc.StartKey)
+	if len(mods) > 0 {
+		return strings.Join(mods, "+") + "+" + key
+	}
+	return key
+}
+
+// updateMenu 更新菜单（包括全局热键）
+func (a *App) updateMenu() {
+	if a.ctx == nil {
+		return
+	}
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	appMenu := menu.NewMenu()
+	operationMenu := appMenu.AddSubmenu("操作")
+
+	// 重置计时
+	if a.settings.Shortcut.Global {
+		accelerator := a.buildResetAccelerator()
+		accel := keys.Key(accelerator)
+		operationMenu.AddText(fmt.Sprintf("重置计时 %s", accelerator), accel, func(_ *menu.CallbackData) {
+			a.ResetTimer()
+		})
+	} else {
+		operationMenu.AddText("重置计时", nil, func(_ *menu.CallbackData) {
+			a.ResetTimer()
+		})
+	}
+
+	// 开始计时
+	if a.settings.Shortcut.Global {
+		accelerator := a.buildStartAccelerator()
+		accel := keys.Key(accelerator)
+		operationMenu.AddText(fmt.Sprintf("开始计时 %s", accelerator), accel, func(_ *menu.CallbackData) {
+			a.StartTimer()
+		})
+	} else {
+		operationMenu.AddText("开始计时", nil, func(_ *menu.CallbackData) {
+			a.StartTimer()
+		})
+	}
+
+	operationMenu.AddText("暂停计时", keys.Key("p"), func(_ *menu.CallbackData) {
+		a.PauseTimer()
+	})
+
+	a.appMenu = appMenu
+	wailsRuntime.MenuSetApplicationMenu(a.ctx, appMenu)
 }
 
 // startup is called when the app starts. The context is saved
@@ -101,6 +202,9 @@ func (a *App) startup(ctx context.Context) {
 
 	// 加载配置
 	a.loadSettings()
+
+	// 更新菜单（包括全局热键）
+	a.updateMenu()
 
 	wailsRuntime.LogInfo(ctx, "应用启动完成")
 }
@@ -236,6 +340,7 @@ func (a *App) GetConfig() SitLongConfig {
 		NotificationDuration: a.settings.NotificationDuration,
 		ActivateOnTimer:      a.settings.ActivateOnTimer,
 		Message:              a.settings.Message,
+		LoopMode:             a.settings.LoopMode,
 	}
 
 	if a.ctx != nil {
@@ -300,6 +405,9 @@ func (a *App) SetShortcut(config ShortcutConfig) error {
 	err := a.saveSettings()
 	a.mu.Unlock()
 
+	// 更新菜单（全局热键可能改变）
+	a.updateMenu()
+
 	return err
 }
 
@@ -331,6 +439,26 @@ func (a *App) SetMessage(message string) error {
 	a.mu.Unlock()
 
 	return err
+}
+
+// SetLoopMode 设置循环模式
+func (a *App) SetLoopMode(loopMode bool) error {
+	a.mu.Lock()
+	a.settings.LoopMode = loopMode
+	err := a.saveSettings()
+	a.mu.Unlock()
+
+	return err
+}
+
+// beforeClose 关闭前清理
+func (a *App) beforeClose(ctx context.Context) bool {
+	a.mu.Lock()
+	if a.timer != nil {
+		a.timer.Stop()
+	}
+	a.mu.Unlock()
+	return false // 允许关闭
 }
 
 // StartTimer 开始计时
@@ -608,20 +736,22 @@ func (a *App) onTimerComplete() {
 	notificationDuration := a.settings.NotificationDuration
 	activateOnTimer := a.settings.ActivateOnTimer
 	message := a.settings.Message
+	loopMode := a.settings.LoopMode
+	interval := a.settings.Interval
 	if message == "" {
 		message = "您已经坐了很久了，起来活动一下吧！"
 	}
 	a.mu.Unlock()
 
 	if a.ctx != nil {
-		wailsRuntime.LogInfo(a.ctx, fmt.Sprintf("计时器完成: isRunning=false, remaining=0"))
+		wailsRuntime.LogInfo(a.ctx, fmt.Sprintf("计时器完成: isRunning=false, remaining=0, loopMode=%v", loopMode))
 	}
 
 	// 发送系统通知
 	iconPath := ""
 
-	if notificationDuration == 0 {
-		// 持久通知 - 使用Alert
+	if notificationDuration == 0 && !loopMode {
+		// 持久通知 - 使用Alert（非循环模式）
 		err := beeep.Alert("久坐提醒", message, iconPath)
 		if err != nil {
 			if a.ctx != nil {
@@ -629,7 +759,7 @@ func (a *App) onTimerComplete() {
 			}
 		}
 	} else {
-		// 非持久通知
+		// 非持久通知（循环模式下强制使用）
 		err := beeep.Notify("久坐提醒", message, iconPath)
 		if err != nil {
 			if a.ctx != nil {
@@ -650,7 +780,29 @@ func (a *App) onTimerComplete() {
 		wailsRuntime.WindowSetAlwaysOnTop(a.ctx, false)
 	}
 
+	// 发送计时完成事件
 	wailsRuntime.EventsEmit(a.ctx, "timer-completed", true)
+
+	// 循环模式：10秒后自动开始下一轮
+	if loopMode {
+		if a.ctx != nil {
+			wailsRuntime.LogInfo(a.ctx, "循环模式开启，10秒后将自动开始下一轮")
+		}
+		go func() {
+			time.Sleep(10 * time.Second)
+			a.mu.Lock()
+			a.remaining = time.Duration(interval) * time.Minute
+			a.isRunning = true
+			a.lastTickTime = time.Now()
+			a.timer = time.AfterFunc(a.remaining, a.onTimerComplete)
+			a.mu.Unlock()
+			
+			if a.ctx != nil {
+				wailsRuntime.LogInfo(a.ctx, fmt.Sprintf("循环模式：自动开始下一轮，间隔=%d分钟", interval))
+			}
+			wailsRuntime.EventsEmit(a.ctx, "timer-reset", float64(interval*60))
+		}()
+	}
 }
 
 // ForceReset 强制重置所有状态

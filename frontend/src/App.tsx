@@ -8,6 +8,7 @@ import {
     SetNotificationDuration,
     SetActivateOnTimer,
     SetMessage,
+    SetLoopMode,
     StartTimer,
     PauseTimer,
     ResetTimer,
@@ -16,10 +17,12 @@ import {
 
 interface ShortcutConfig {
     resetKey: string;
+    startKey: string;
     closeNotifyKey: string;
     ctrl: boolean;
     shift: boolean;
     alt: boolean;
+    global: boolean;
 }
 
 interface Config {
@@ -30,6 +33,7 @@ interface Config {
     notificationDuration: number;
     activateOnTimer: boolean;
     message: string;
+    loopMode: boolean;
 }
 
 const defaultConfig: Config = {
@@ -38,14 +42,17 @@ const defaultConfig: Config = {
     remaining: 30 * 60,
     shortcut: {
         resetKey: 'r',
+        startKey: 's',
         closeNotifyKey: 'Escape',
         ctrl: true,
         shift: true,
-        alt: false
+        alt: false,
+        global: true
     },
     notificationDuration: 0,
     activateOnTimer: true,
     message: '您已经坐了很久了，起来活动一下吧！',
+    loopMode: false,
 };
 
 // 预设文案
@@ -65,6 +72,15 @@ function App() {
 
     const operationLock = useRef(false);
     const [localShortcut, setLocalShortcut] = useState<ShortcutConfig>(defaultConfig.shortcut);
+
+    // 计算快捷键显示文本
+    const getShortcutDisplay = (sc: ShortcutConfig): string => {
+        const parts: string[] = [];
+        if (sc.ctrl) parts.push('⌃');
+        if (sc.shift) parts.push('⇧');
+        if (sc.alt) parts.push('⌥');
+        return parts.join('') + sc.startKey.toUpperCase() + ' 开始 / ' + sc.resetKey.toUpperCase() + ' 重置';
+    };
 
     const formatTime = (seconds: number): string => {
         const mins = Math.floor(Math.abs(seconds) / 60);
@@ -122,17 +138,42 @@ function App() {
         });
     }, []);
 
+    // 循环模式下，通知10秒后自动关闭
+    useEffect(() => {
+        if (notification && config.loopMode) {
+            console.log('循环模式：10秒后自动关闭通知');
+            const timer = setTimeout(() => {
+                console.log('自动关闭通知');
+                setNotification(false);
+            }, 10000);
+            return () => clearTimeout(timer);
+        }
+    }, [notification, config.loopMode]);
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const key = e.key;
             const shortcut = config.shortcut;
 
+            // 修饰键匹配：配置为true时必须有该键按下，配置为false时必须没有按下
+            const matchCtrl = (!shortcut.ctrl && !e.ctrlKey) || (shortcut.ctrl && e.ctrlKey);
+            const matchShift = (!shortcut.shift && !e.shiftKey) || (shortcut.shift && e.shiftKey);
+            const matchAlt = (!shortcut.alt && !e.altKey) || (shortcut.alt && e.altKey);
+
+            const matchStart = (
+                key.toLowerCase() === shortcut.startKey.toLowerCase() &&
+                matchCtrl && matchShift && matchAlt
+            );
             const matchReset = (
                 key.toLowerCase() === shortcut.resetKey.toLowerCase() &&
-                e.ctrlKey === shortcut.ctrl &&
-                e.shiftKey === shortcut.shift &&
-                e.altKey === shortcut.alt
+                matchCtrl && matchShift && matchAlt
             );
+
+            if (matchStart) {
+                e.preventDefault();
+                handleStart();
+                return;
+            }
 
             if (matchReset) {
                 e.preventDefault();
@@ -223,6 +264,13 @@ function App() {
         }, '保存激活窗口设置');
     };
 
+    const handleLoopModeChange = async (checked: boolean) => {
+        await withLock(async () => {
+            await SetLoopMode(checked);
+            setConfig(prev => ({...prev, loopMode: checked}));
+        }, '保存循环模式设置');
+    };
+
     const handleSaveMessage = async () => {
         await withLock(async () => {
             if (!localMessage.trim()) {
@@ -237,17 +285,6 @@ function App() {
     const handlePresetSelect = (preset: typeof MESSAGE_PRESETS[0]) => {
         setLocalMessage(preset.value);
     };
-
-    const getShortcutDisplay = (sc: ShortcutConfig): string => {
-        const parts: string[] = [];
-        if (sc.ctrl) parts.push('Ctrl');
-        if (sc.shift) parts.push('Shift');
-        if (sc.alt) parts.push('Alt');
-        parts.push(sc.resetKey.toUpperCase());
-        return parts.join('+');
-    };
-
-    const currentResetShortcut = getShortcutDisplay(config.shortcut);
 
     return (
         <div id="App">
@@ -358,8 +395,16 @@ function App() {
                         </div>
 
                         <div className="setting-row">
-                            <label className="setting-label">当前快捷键</label>
-                            <span className="shortcut-hint">{currentResetShortcut}</span>
+                            <label className="setting-label">循环模式</label>
+                            <label className="switch">
+                                <input
+                                    type="checkbox"
+                                    checked={config.loopMode}
+                                    onChange={(e) => handleLoopModeChange(e.target.checked)}
+                                    disabled={isProcessing}
+                                />
+                                <span className="slider"/>
+                            </label>
                         </div>
 
                         <div className="setting-row save-row">
@@ -420,7 +465,19 @@ function App() {
                     <div className="settings-content">
                     <>
                         <div className="setting-row">
-                            <label className="setting-label">重置键</label>
+                            <label className="setting-label">开始键</label>
+                            <input
+                                type="text"
+                                value={localShortcut.startKey}
+                                onChange={(e) => setLocalShortcut(prev => ({
+                                    ...prev, startKey: e.target.value
+                                }))}
+                                className="input-shortcut"
+                                maxLength={1}
+                                placeholder="如: s"
+                                disabled={isProcessing}
+                            />
+                            <label className="setting-label" style={{marginLeft: '20px'}}>重置键</label>
                             <input
                                 type="text"
                                 value={localShortcut.resetKey}
@@ -430,20 +487,6 @@ function App() {
                                 className="input-shortcut"
                                 maxLength={1}
                                 placeholder="如: r"
-                                disabled={isProcessing}
-                            />
-                        </div>
-
-                        <div className="setting-row">
-                            <label className="setting-label">关闭通知键</label>
-                            <input
-                                type="text"
-                                value={localShortcut.closeNotifyKey}
-                                onChange={(e) => setLocalShortcut(prev => ({
-                                    ...prev, closeNotifyKey: e.target.value
-                                }))}
-                                className="input-shortcut"
-                                placeholder="如: Escape"
                                 disabled={isProcessing}
                             />
                         </div>
@@ -487,9 +530,26 @@ function App() {
                             </div>
                         </div>
 
-                       
+                        <div className="setting-row">
+                            <label className="setting-label">全局生效</label>
+                            <label className="switch">
+                                <input
+                                    type="checkbox"
+                                    checked={localShortcut.global}
+                                    onChange={(e) => setLocalShortcut(prev => ({
+                                        ...prev, global: e.target.checked
+                                    }))}
+                                    disabled={isProcessing}
+                                />
+                                <span className="slider"/>
+                            </label>
+                            <span className="hint-text"><span className="shortcut-preview">
+                                当前: <span className="key">{getShortcutDisplay(localShortcut)}</span>
+                            </span></span>
+                        </div>
 
                         <div className="setting-row save-row">
+                            
                             <button className="btn btn-save" onClick={saveShortcut} disabled={isProcessing}>
                                 {isProcessing ? '...' : '保存快捷键'}
                             </button>
@@ -505,10 +565,10 @@ function App() {
                 <ul>
                     <li>设置提醒间隔后点击「开始」</li>
                     <li>
-                        <span className="key">{currentResetShortcut}</span> 重置计时
-                        | 通知时按 <span className="key">{config.shortcut.closeNotifyKey}</span> 关闭
+                        <span className="key">{getShortcutDisplay(config.shortcut)}</span>
+                        {config.shortcut.global && <span className="hint-text">（全局）</span>}
                     </li>
-                    <li>点击「快捷键」标签自定义快捷键</li>
+                    <li>点击「快捷键」标签自定义热键</li>
                 </ul>
             </div>
         </div>

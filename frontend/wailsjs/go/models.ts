@@ -2,10 +2,12 @@ export namespace main {
 	
 	export class ShortcutConfig {
 	    resetKey: string;
+	    startKey: string;
 	    closeNotifyKey: string;
 	    ctrl: boolean;
 	    shift: boolean;
 	    alt: boolean;
+	    global: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ShortcutConfig(source);
@@ -14,10 +16,12 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.resetKey = source["resetKey"];
+	        this.startKey = source["startKey"];
 	        this.closeNotifyKey = source["closeNotifyKey"];
 	        this.ctrl = source["ctrl"];
 	        this.shift = source["shift"];
 	        this.alt = source["alt"];
+	        this.global = source["global"];
 	    }
 	}
 	export class SitLongConfig {
@@ -28,6 +32,7 @@ export namespace main {
 	    notificationDuration: number;
 	    activateOnTimer: boolean;
 	    message: string;
+	    loopMode: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new SitLongConfig(source);
@@ -42,6 +47,7 @@ export namespace main {
 	        this.notificationDuration = source["notificationDuration"];
 	        this.activateOnTimer = source["activateOnTimer"];
 	        this.message = source["message"];
+	        this.loopMode = source["loopMode"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
