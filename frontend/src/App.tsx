@@ -13,6 +13,7 @@ import {
     PauseTimer,
     ResetTimer,
     GetRemainingTime,
+    GetVersion,
 } from "../wailsjs/go/main/App";
 
 interface ShortcutConfig {
@@ -69,6 +70,8 @@ function App() {
     const [activeTab, setActiveTab] = useState<'timer' | 'message' | 'shortcut'>('timer');
     const [isProcessing, setIsProcessing] = useState(false);
     const [localMessage, setLocalMessage] = useState('');
+    const [showAbout, setShowAbout] = useState(false);
+    const [appVersion, setAppVersion] = useState('');
 
     const operationLock = useRef(false);
     const [localShortcut, setLocalShortcut] = useState<ShortcutConfig>(defaultConfig.shortcut);
@@ -135,6 +138,16 @@ function App() {
                 isRunning: true
             }));
             setIsProcessing(false);
+        });
+
+        EventsOn('show-about', async () => {
+            try {
+                const ver = await GetVersion();
+                setAppVersion(ver);
+            } catch {
+                setAppVersion('');
+            }
+            setShowAbout(true);
         });
     }, []);
 
@@ -308,6 +321,22 @@ function App() {
                             onClick={() => setNotification(false)}
                         >
                             我知道了
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {showAbout && (
+                <div className="notification-overlay" onClick={() => setShowAbout(false)}>
+                    <div className="notification-box" onClick={e => e.stopPropagation()}>
+                        <div className="notification-icon">📋</div>
+                        <h2>关于 久坐提醒</h2>
+                        <p>版本：{appVersion}</p>
+                        <button
+                            className="notification-btn"
+                            onClick={() => setShowAbout(false)}
+                        >
+                            确定
                         </button>
                     </div>
                 </div>

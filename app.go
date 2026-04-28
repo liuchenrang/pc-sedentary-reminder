@@ -181,8 +181,28 @@ func (a *App) updateMenu() {
 		a.PauseTimer()
 	})
 
+	// 帮助菜单
+	helpMenu := appMenu.AddSubmenu("帮助")
+
+	helpMenu.AddText("关于软件", nil, func(_ *menu.CallbackData) {
+		wailsRuntime.EventsEmit(a.ctx, "show-about")
+	})
+
+	helpMenu.AddText("软件介绍", nil, func(_ *menu.CallbackData) {
+		wailsRuntime.BrowserOpenURL(a.ctx, "https://www.haogongjua.cn/cms/sitlong/")
+	})
+
+	helpMenu.AddText("在线工具", nil, func(_ *menu.CallbackData) {
+		wailsRuntime.BrowserOpenURL(a.ctx, "https://www.haogongjua.cn/")
+	})
+
 	a.appMenu = appMenu
 	wailsRuntime.MenuSetApplicationMenu(a.ctx, appMenu)
+}
+
+// GetVersion 获取软件版本号
+func (a *App) GetVersion() string {
+	return AppVersion
 }
 
 // startup is called when the app starts. The context is saved

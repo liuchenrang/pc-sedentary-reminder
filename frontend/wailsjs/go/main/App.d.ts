@@ -8,6 +8,8 @@ export function GetConfig():Promise<main.SitLongConfig>;
 
 export function GetRemainingTime():Promise<number>;
 
+export function GetVersion():Promise<string>;
+
 export function PauseTimer():Promise<void>;
 
 export function ResetTimer():Promise<void>;

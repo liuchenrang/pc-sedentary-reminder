@@ -14,6 +14,10 @@ export function GetRemainingTime() {
   return window['go']['main']['App']['GetRemainingTime']();
 }
 
+export function GetVersion() {
+  return window['go']['main']['App']['GetVersion']();
+}
+
 export function PauseTimer() {
   return window['go']['main']['App']['PauseTimer']();
 }
