@@ -63,6 +63,9 @@ jobs:
         env:
           CGO_ENABLED: 1
 
+      - name: List build output (debug)
+        run: ls -la build/bin/
+
       - name: Package (Windows)
         if: matrix.platform == 'windows'
         run: |
