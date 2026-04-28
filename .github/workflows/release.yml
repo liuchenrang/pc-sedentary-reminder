@@ -27,7 +27,7 @@ jobs:
           - os: macos-latest
             platform: darwin
             ext: ''
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             platform: linux
             ext: ''
 
@@ -54,7 +54,7 @@ jobs:
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
 
       - name: Build
         run: |
@@ -62,9 +62,6 @@ jobs:
           wails build -ldflags "-X main.AppVersion=$TAG_NAME"
         env:
           CGO_ENABLED: 1
-
-      - name: List build output (debug)
-        run: ls -la build/bin/
 
       - name: Package (Windows)
         if: matrix.platform == 'windows'
