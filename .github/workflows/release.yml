@@ -73,7 +73,7 @@ jobs:
         if: matrix.platform == 'darwin'
         run: |
           cd build/bin
-          zip sitlong-${{ github.ref_name }}-darwin-amd64.zip sitlong
+          zip -r sitlong-${{ github.ref_name }}-darwin-amd64.zip sitlong.app
 
       - name: Package (Linux)
         if: matrix.platform == 'linux'
@@ -90,6 +90,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
 
     steps:
       - name: Download all artifacts
