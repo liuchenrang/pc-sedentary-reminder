@@ -24,7 +24,7 @@ jobs:
           - os: windows-latest
             platform: windows
             ext: .exe
-          - os: macos-latest
+          - os: macos-13
             platform: darwin
             ext: ''
           - os: ubuntu-22.04
