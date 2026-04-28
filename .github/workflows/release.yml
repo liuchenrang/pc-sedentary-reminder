@@ -66,8 +66,8 @@ jobs:
           wails build -ldflags "-X main.AppVersion=$TAG_NAME" -platform darwin/arm64
           mv build/bin/sitlong.app build/bin/sitlong-arm64.app
 
-          # Clean and build amd64 (cross-compile)
-          rm -rf build/bin
+          # Build amd64 (cross-compile) - only remove the default app, keep arm64
+          rm -rf build/bin/sitlong.app
           wails build -ldflags "-X main.AppVersion=$TAG_NAME" -platform darwin/amd64
           mv build/bin/sitlong.app build/bin/sitlong-amd64.app
 
