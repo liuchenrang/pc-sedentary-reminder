@@ -24,7 +24,7 @@ jobs:
           - os: windows-latest
             platform: windows
             ext: .exe
-          - os: macos-13
+          - os: macos-latest
             platform: darwin
             ext: ''
           - os: ubuntu-22.04
@@ -56,7 +56,39 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
 
-      - name: Build
+      - name: Build (macOS Universal)
+        if: matrix.platform == 'darwin'
+        shell: bash
+        run: |
+          TAG_NAME=${{ github.event.inputs.tag || github.ref_name }}
+
+          # Build arm64
+          wails build -ldflags "-X main.AppVersion=$TAG_NAME" -platform darwin/arm64
+          mv build/bin/sitlong.app build/bin/sitlong-arm64.app
+
+          # Clean and build amd64 (cross-compile)
+          rm -rf build/bin
+          wails build -ldflags "-X main.AppVersion=$TAG_NAME" -platform darwin/amd64
+          mv build/bin/sitlong.app build/bin/sitlong-amd64.app
+
+          # Create universal binary using lipo
+          mkdir -p build/bin/sitlong.app/Contents/MacOS
+          lipo -create \
+            build/bin/sitlong-arm64.app/Contents/MacOS/sitlong \
+            build/bin/sitlong-amd64.app/Contents/MacOS/sitlong \
+            -output build/bin/sitlong.app/Contents/MacOS/sitlong
+
+          # Copy resources from arm64 version
+          cp -R build/bin/sitlong-arm64.app/Contents/Resources build/bin/sitlong.app/Contents/
+          cp build/bin/sitlong-arm64.app/Contents/Info.plist build/bin/sitlong.app/Contents/
+
+          # Codesign the universal app
+          codesign --force --deep --sign - build/bin/sitlong.app || true
+        env:
+          CGO_ENABLED: 1
+
+      - name: Build (non-macOS)
+        if: matrix.platform != 'darwin'
         shell: bash
         run: |
           TAG_NAME=${{ github.event.inputs.tag || github.ref_name }}
@@ -74,7 +106,7 @@ jobs:
         if: matrix.platform == 'darwin'
         run: |
           cd build/bin
-          zip -r sitlong-${{ github.ref_name }}-darwin-amd64.zip sitlong.app
+          zip -r sitlong-${{ github.ref_name }}-darwin-universal.zip sitlong.app
 
       - name: Package (Linux)
         if: matrix.platform == 'linux'
